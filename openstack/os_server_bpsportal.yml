@@ -1,0 +1,63 @@
+---
+# Create instance BPSPORTAL
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 26, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  vars:
+    instanceName: "BPSPORTAL"
+    flavorName: "m1.large.v2.1"
+    cloud: "wind"
+    openstackrc: "./keystone_xxx"
+    netname: "private_xxx"
+    keyfile: "./xxx.pem"
+    image: "CentOS7mini"
+
+  tasks:
+  - name: create security groups
+    os_security_group:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     description: security group for {{instanceName}} server
+
+  - name: add security group rules
+    os_security_group_rule:
+     cloud: "{{cloud}}"
+     security_group: "{{instanceName}}"
+     state: present
+     protocol: tcp
+     port_range_min: "{{item}}"
+     port_range_max: "{{item}}"
+     remote_ip_prefix: 0.0.0.0/0
+    with_items:
+      - 8080
+      - 22
+
+  - name: Create a new instance and attaches to a network and passes metadata to the instance
+    os_server:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     image: "{{image}}"
+     key_name: DAIKey
+     timeout: 200
+     flavor: "{{flavorName}}"
+     security_groups: "default,{{instanceName}}"
+     nics:
+       - net-name: "{{netname}}"
+     auto_ip: yes
+     meta:
+       hostname: "{{instanceName}}"
+    register: instance
+
+  - name: Show result of creation
+    debug:
+      var: "{{item}}"
+    with_items:
+      #- instance
+      #- instance.server.accessIPv4
+      - instance.server.public_v4
+      - instance.server.private_v4

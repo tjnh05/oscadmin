@@ -1,0 +1,25 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  tasks:
+  # Gather facts about all available flavors
+  - os_flavor_facts:
+      cloud: dai
+  - debug:
+      var: openstack_flavors
+  - os_flavor_facts:
+      cloud: dai
+      name: "m1.xlarge.dai"
+  - debug:
+      var: openstack_flavors
+  - os_flavor_facts:
+      cloud: dai
+      ram: ">=16384"
+      limit: 2
+  - debug:
+      var: openstack_flavors

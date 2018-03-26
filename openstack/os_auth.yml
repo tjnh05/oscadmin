@@ -1,0 +1,16 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Dec 26, 2017
+- hosts: controller.xxx.com
+  become: no
+
+  tasks:
+  - name: Authenticate to the cloud and retrieve the service catalog
+    os_auth:
+      cloud: dai
+
+  - name: Show service catalog
+    debug:
+      var: service_catalog

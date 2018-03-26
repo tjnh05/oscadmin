@@ -1,0 +1,43 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  vars:
+
+  tasks:
+  - name: remove instance r4host[3-8]
+    os_server:
+     cloud: dai
+     state: absent
+     name: "{{item}}"
+    with_items:
+      - r4host8
+      - r4host7
+      - r4host6
+      - r4host5
+      - r4host4
+      - r4host3
+
+  - name: Create a new instance and attaches to a network and passes metadata to the instance
+    os_server:
+     cloud: dai
+     state: present
+     name: r4host8
+     image: CentOS7mini
+     key_name: DAIKey
+     timeout: 200
+     flavor: "m1.medium"
+     security_groups: "default,foo1"
+     nics:
+       - net-name: selfservice
+     floating_ips:
+       - 192.13.1.71
+     meta:
+       hostname: r4host8
+    tags:
+       - CREATE_INSTANCE
+

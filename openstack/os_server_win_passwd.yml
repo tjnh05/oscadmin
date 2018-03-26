@@ -1,0 +1,28 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  vars:
+    instanceName: "wind7"
+    flavorName: "m1.medium.wind"
+    cloud: "wind"
+    openstackrc: "./keystone_xxx"
+    netname: "private_xxx"
+    keyfile: "./xxx.pem"
+
+  tasks:
+  - name: Retrieve password of user Admin
+    shell: "cd ~ && source {{openstackrc}} && nova --os-project-name $OS_PROJECT_NAME get-password {{instanceName}} {{keyfile}}"
+    register: password
+    changed_when: false
+
+  - name: Show result of creation
+    debug:
+      var: "{{item}}"
+    with_items:
+      - password
+      - password.stdout

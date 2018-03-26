@@ -1,0 +1,76 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  vars:
+    instanceName: "wind7"
+    flavorName: "m1.medium.wind"
+    cloud: "wind"
+    openstackrc: "./keystonerc_wind"
+    netname: "private_wind"
+    keyfile: "./daikey.pem"
+
+  tasks:
+  - name: create security groups
+    os_security_group:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     description: security group for {{instanceName}} server
+
+  - name: add security group rules
+    os_security_group_rule:
+     cloud: "{{cloud}}"
+     security_group: "{{instanceName}}"
+     state: present
+     protocol: tcp
+     port_range_min: "{{item}}"
+     port_range_max: "{{item}}"
+     remote_ip_prefix: 0.0.0.0/0
+    with_items:
+      - 3389
+      - 8001
+
+  - name: Create a new instance and attaches to a network and passes metadata to the instance
+    os_server:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     image: "Windows Server 2012 R2 Std Eval"
+     key_name: DAIKey
+     timeout: 200
+     flavor: "{{flavorName}}"
+     security_groups: "default,{{instanceName}}"
+     nics:
+       - net-name: "{{netname}}"
+     auto_ip: yes
+     meta:
+       hostname: "{{instanceName}}"
+    register: instance
+
+  - name: Show result of creation
+    debug:
+      var: "{{item}}"
+    with_items:
+      #- instance
+      #- instance.server.accessIPv4
+      - instance.server.public_v4
+      - instance.server.private_v4
+      
+  - name: Retrieve password of user Admin
+    shell: "cd ~ && source {{openstackrc}} && \
+            nova --timeout 90 --os-project-name \
+                 $OS_PROJECT_NAME get-password {{instanceName}} {{keyfile}}"
+    register: password
+    changed_when: false
+
+  - name: Show result of creation
+    debug:
+      var: "{{item}}"
+    with_items:
+      #- password
+      - password.stdout

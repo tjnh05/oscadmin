@@ -1,0 +1,22 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  tasks:
+  - name: add security group rules
+    os_security_group_rule:
+     cloud: dai
+     security_group: foo1
+     state: present
+     protocol: tcp
+     port_range_min: "{{item}}"
+     port_range_max: "{{item}}"
+     remote_ip_prefix: 0.0.0.0/0
+    with_items:
+      - 80
+      - 443
+

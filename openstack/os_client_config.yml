@@ -1,0 +1,21 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Dec 26, 2017
+- hosts: controller.xxx.com
+
+  tasks:
+   - name: Get list of clouds that do not support security groups
+     os_client_config:
+
+   - debug:
+       var: "{{ item }}"
+     with_items: "{{ openstack.clouds | rejectattr('secgroup_source', 'none') | list }}"
+
+   - name: Get the information back just about the admin/dai/wind cloud
+     os_client_config:
+      clouds:
+        - admin
+        - dai
+        - wind

@@ -1,0 +1,28 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  tasks:
+  # attach a floating IP address to a server
+  - os_floating_ip:
+     cloud: dai
+     state: present
+     floating_ip_address: 192.13.1.71
+     server: rhost8
+
+  - debug:
+     var: floating_ip
+
+  # Detach a floating IP address from a server
+  #- os_floating_ip:
+  #   cloud: dai
+  #   state: absent
+  #   floating_ip_address: 192.13.1.71
+  #   server: rhost8
+
+  #- debug:
+  #   var: floating_ip

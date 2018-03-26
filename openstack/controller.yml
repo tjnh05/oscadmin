@@ -1,0 +1,20 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Dec 26, 2017
+- hosts: controller.xxx.com
+  become: yes
+  become_user: root
+
+  tasks:
+   - name: Install packages
+     yum: name={{item}} state=present 
+     with_items:
+       - python-devel
+       - python-openstackclient
+       - python-heatclient
+   - name: Install python modules
+     pip: name={{item}} state=present extra_args="--upgrade"
+     with_items:
+       - shade

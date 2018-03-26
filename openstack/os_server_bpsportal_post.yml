@@ -1,0 +1,37 @@
+---
+# post process for instance BPSPORTAL
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 26, 2018
+- hosts: bpsportal.xxx.com
+  become: yes
+  become_user: root
+
+  vars:
+  - password: "root:9d97abe3cdd232aefebf\ncentos:6c16a5276f1d661e73bb"
+
+  tasks:
+  - name: Update the system to the latest
+    command: yum update -y
+    args:
+      warn: no
+
+  - name: Set timezone as Asia/Shanghai
+    command: timedatectl set-timezone Asia/Shanghai
+
+  - name: Modify password of user root and centos
+    shell: echo -e "{{password}}" | chpasswd
+
+  - name: Modify /etc/ssh/sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAuthentication yes'
+      insertafter: "^#PasswordAuthentication yes"
+      line: 'PasswordAuthentication yes'
+    
+  - name: Restart sshd service
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - sshd

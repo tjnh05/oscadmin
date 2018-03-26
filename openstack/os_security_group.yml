@@ -1,0 +1,19 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 15, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  tasks:
+  - name: create security groups
+    os_security_group:
+     cloud: dai
+     state: present
+     name: "{{item}}"
+     description: security group for {{item}} server
+    with_items:
+      - foo1
+      - foo2
+
