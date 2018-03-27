@@ -1,0 +1,110 @@
+---
+# post process for instance BPSPORTAL
+# written by bodhi wang
+# bodwang@deloitte.com.cn
+# Mar 26, 2018
+- hosts: download.deloittecloud.com
+  become: yes
+  become_user: root
+
+  vars:
+    password: "root:a48a207e51e35b1a1107\ncentos:f9f25fe6c1311fd75427"
+    GIT_DIR: /usr/local/src/
+    PROXY_SERV: 172.16.1.31
+
+  tasks:
+  - name: Update the system to the latest
+    command: yum update -y
+    args:
+      warn: no
+    tags:
+      - system
+
+  - name: Set timezone as Asia/Shanghai
+    command: timedatectl set-timezone Asia/Shanghai
+    tags:
+      - system
+
+  - name: Modify password of user root and centos
+    shell: echo -e "{{password}}" | chpasswd
+    tags:
+      - system
+
+  - name: Modify /etc/ssh/sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAuthentication yes'
+      insertafter: "^#PasswordAuthentication yes"
+      line: 'PasswordAuthentication yes'
+    tags:
+      - system
+    
+  - name: Restart sshd service
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - sshd
+    tags:
+      - system
+
+  - name: Install softwares
+    yum: name={{item}} state=present
+    with_items:
+      - git
+      - wget
+      - "@Development tools"
+    tags:
+      - basic
+
+  - name: Clone projects from remote repositories.
+    git:
+       repo: "{{item.repo}}"
+       dest: "{{item.dest}}"
+    with_items:
+      - { repo: "https://github.com/rofl0r/proxychains-ng.git",dest: "{{GIT_DIR}}proxychains-ng" }
+    tags:
+      - proxychains
+
+  - name: Install proxychains.
+    shell: |
+      ./configure --prefix=/usr --sysconfdir=/etc && make && make install && make install-config
+      sed -i -e 's/^socks4.*$/socks5 {{PROXY_SERV}} 1080/' \
+             -e 's/^#quiet_mode.*$/quiet_mode/' \
+             /etc/proxychains.conf
+    args:
+      chdir: "{{GIT_DIR}}proxychains-ng"
+      executable: /bin/sh
+      creates: "/etc/proxychains.conf" 
+    tags:
+      - proxychains
+      
+  - name: Download tool
+    command: proxychains4 wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/p0rn-dl/p0rn-dl-2.0-Linux-Universal-Installer.tar.gz
+    args:
+      chdir: "{{GIT_DIR}}"
+      creates: "{{GIT_DIR}}p0rn-dl-2.0-Linux-Universal-Installer.tar.gz"
+    tags:
+      - porndl
+
+  - name: Creates directory
+    file: path={{GIT_DIR}}porndl state=directory
+    tags:
+      - porndl
+      
+
+  - name: Unpack tool
+    command: tar zxvf {{GIT_DIR}}p0rn-dl-2.0-Linux-Universal-Installer.tar.gz
+    args:
+      chdir: "{{GIT_DIR}}porndl"
+      creates: "{{GIT_DIR}}porndl/bin.tar.gz"
+      warn: no
+    tags:
+      - porndl
+
+  - name: Install tool
+    command: bash ./install.sh
+    args:
+      chdir: "{{GIT_DIR}}porndl"
+    tags:
+      - porndl
