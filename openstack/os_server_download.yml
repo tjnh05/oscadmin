@@ -1,9 +1,9 @@
 ---
 # Create instance BPSPORTAL
 # written by bodhi wang
-# bodwang@deloitte.com.cn
+# jyxz5@qq.com
 # Mar 26, 2018
-- hosts: controller.deloittecloud.com
+- hosts: controller.xxx.com
   become: no
 
   vars:

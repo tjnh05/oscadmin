@@ -1,9 +1,9 @@
 ---
 # post process for instance BPSPORTAL
 # written by bodhi wang
-# bodwang@deloitte.com.cn
+# jyxz5@qq.com
 # Mar 26, 2018
-- hosts: download.deloittecloud.com
+- hosts: download.xxx.com
   become: yes
   become_user: root
 
