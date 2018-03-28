@@ -3,12 +3,16 @@
 # written by bodhi wang
 # jyxz5@qq.com
 # Mar 26, 2018
+# 
+# modify the process to modify user's passwords.
+# jyxz5@qq.com
+# Mar 28, 2018
+#
 - hosts: download.xxx.com
   become: yes
   become_user: root
 
   vars:
-    password: "root:a48a207e51e35b1a1107\ncentos:f9f25fe6c1311fd75427"
     GIT_DIR: /usr/local/src/
     PROXY_SERV: 172.16.1.31
 
@@ -25,8 +29,24 @@
     tags:
       - system
 
+  - name: Generate root/centos password
+    shell: |
+           openssl rand -hex 10|awk '{print "root:"$1}'
+           openssl rand -hex 10|awk '{print "centos:"$1}'
+    register: password
+    args:
+      warn: no
+    tags:
+      - system
+
+  - name: Show register variable
+    debug:
+      var: password.stdout
+    tags:
+      - system
+
   - name: Modify password of user root and centos
-    shell: echo -e "{{password}}" | chpasswd
+    shell: echo -e "{{password.stdout}}" | chpasswd
     tags:
       - system
 
