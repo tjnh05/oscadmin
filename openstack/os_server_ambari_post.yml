@@ -1,0 +1,164 @@
+---
+# post process for instance 
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 26, 2018
+# 
+# modify the process to modify user's passwords.
+# jyxz5@qq.com
+# Mar 28, 2018
+#
+- hosts: ambari.xxx.com
+  become: yes
+  become_user: root
+
+  vars:
+    GIT_DIR: /usr/local/src/
+    PROXY_SERV: 172.16.1.31
+    RESET_PASSWD: "NO"
+
+  tasks:
+  - name: Update the system to the latest
+    command: yum update -y
+    args:
+      warn: no
+    tags:
+      - system
+
+  - name: Set timezone as Asia/Shanghai
+    command: timedatectl set-timezone Asia/Shanghai
+    tags:
+      - system
+
+  - name: Generate root/centos password
+    shell: |
+           openssl rand -hex 10|awk '{print "root:"$1}'
+           openssl rand -hex 10|awk '{print "centos:"$1}'
+    register: password
+    args:
+      warn: no
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Show register variable
+    debug:
+      var: password.stdout
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify password of user root and centos
+    shell: echo -e "{{password.stdout}}" | chpasswd
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify /etc/ssh/sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAuthentication yes'
+      insertafter: "^#PasswordAuthentication yes"
+      line: 'PasswordAuthentication yes'
+    tags:
+      - system
+    
+  - name: Restart sshd service
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - sshd
+    tags:
+      - system
+
+  - name: Install ambari.repo
+    get_url:
+      dest: /etc/yum.repos.d/ambary.repo
+      url: http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.6.0.0/ambari.repo 
+    tags:
+      - ambari
+
+  - name: Install openjdk/chrony/sysstat/expect/ambari-server.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - java-1.8.0-openjdk.x86_64
+      - chrony
+      - sysstat
+      - expect
+      - ambari-server
+    tags:
+      - ambari
+
+  - name: Set environment variable JAVA_HOME
+    lineinfile:
+      path: /etc/environment
+      regexp: '^JAVA_HOME='
+      line: 'JAVA_HOME=/etc/alternatives/jre_openjdk'
+    tags:
+      - ambari
+
+  - name: Stop postgresql service on host ambari-server
+    service: 
+      name: "{{item}}"
+      state: stopped
+      enabled: no
+    with_items:
+      - postgresql
+    tags:
+      - postgresql
+     
+  - name: Remove postgresql* packages.
+    yum: 
+      name: "{{item}}"
+      state: absent
+    with_items:
+      - postgresql-libs-9.2.23-1.el7_4.x86_64
+      - postgresql-server-9.2.23-1.el7_4.x86_64
+      - postgresql-9.2.23-1.el7_4.x86_64
+    tags:
+      - postgresql
+
+  - name: Setup Ambari server.
+    shell: |
+      set timeout 10
+      spawn ambari-server setup
+
+      expect "OK to continue \[y/n\] (y)?"
+      send "\r"
+
+      expect "Customize user account for ambari-server daemon \[y/n\] (n)\?"
+      send "\r"
+
+      expect "Do you want to change Oracle JDK \[y/n\] (n)?"
+      send "y\r"
+
+      expect "Enter choice (1):"
+      send "3\r"
+
+      expect "Path to JAVA_HOME:"
+      send "/etc/alternatives/jre_openjdk\r"
+
+      expect "Enter advanced database configuration \[y/n\] (n)?"
+      send "\r"
+
+      expect eof
+
+      exit 0
+    args:
+      executable: /usr/bin/expect
+    tags:
+      - ambari_setup
+
+  - name: Startup ambari-server service
+    service: 
+      name: "{{item}}"
+      state: restarted
+      enabled: yes
+    with_items:
+      - ambari-server
+    tags:
+      - ambari_setup
+

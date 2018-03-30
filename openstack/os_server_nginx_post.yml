@@ -1,0 +1,121 @@
+---
+# post process for instance 
+# written by bodhi wang
+# jyxz5@qq.com
+# Mar 26, 2018
+# 
+# modify the process to modify user's passwords.
+# jyxz5@qq.com
+# Mar 28, 2018
+#
+- hosts: nginx.xxx.com
+  become: yes
+  become_user: root
+
+  vars:
+    RESET_PASSWD: "NO"
+
+  tasks:
+  - name: Update the system to the latest
+    command: yum update -y
+    args:
+      warn: no
+    tags:
+      - system
+
+  - name: Set timezone as Asia/Shanghai
+    command: timedatectl set-timezone Asia/Shanghai
+    tags:
+      - system
+
+  - name: Generate root/centos password
+    shell: |
+           openssl rand -hex 10|awk '{print "root:"$1}'
+           openssl rand -hex 10|awk '{print "centos:"$1}'
+    register: password
+    args:
+      warn: no
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Show register variable
+    debug:
+      var: password.stdout
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify password of user root and centos
+    shell: echo -e "{{password.stdout}}" | chpasswd
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify /etc/ssh/sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAuthentication yes'
+      insertafter: "^#PasswordAuthentication yes"
+      line: 'PasswordAuthentication yes'
+    tags:
+      - system
+    
+  - name: Restart sshd service
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - sshd
+    tags:
+      - system
+
+  - name: Disable SELinux (/etc/selinux/config)
+    selinux:
+      state: disabled
+    register: result
+    tags:
+      - system
+
+  - name: Show the result of disabling SELinux
+    debug:
+      var: result
+    tags:
+      - system
+
+  - name: Set enforce of SELinux as 0
+    command: setenforce 0
+    #args:
+    #  warn: no
+    tags:
+      - system
+
+  - name: Install epel-release.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - epel-release
+    tags:
+      - system
+
+  - name: Install nginx.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - epel-release
+      - nginx
+    tags:
+      - nginx
+
+  - name: Start nginx service
+    service:
+      name: "{{item}}"
+      state: started
+      enabled: yes
+    with_items:
+      - nginx
+    tags:
+      - nginx
+
