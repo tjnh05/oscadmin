@@ -1,0 +1,5 @@
+EXPIRED_DAYS: 25
+FTP_USER: test
+FTP_PASSWD: "password"
+FTP_HOST: ftp.xxx.com
+

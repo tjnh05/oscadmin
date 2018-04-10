@@ -1,0 +1,31 @@
+---
+# Create sparkuser home directory of hdfs
+# written by bodhi wang
+# jyxz5@qq.com
+# Apr 10, 2018
+- hosts: openstack
+  become: yes
+  become_user: root
+
+  vars_files:
+   - ftpvars.yml
+
+  vars:
+    REMOVE_IND: "YES"
+
+  tasks:
+   - name: Find out outdated and compressed log file, then upload them to ftp server
+     shell: |
+       find  /var/log -mtime +{{EXPIRED_DAYS}}  -name "*.gz" -exec curl -T {} \
+             ftp://{{FTP_USER}}:{{FTP_PASSWD}}@{{FTP_HOST}}/{{inventory_hostname}}/{} \
+             -k --ftp-ssl -1 --ftp-create-dirs \;
+     tags:
+       - backup
+
+   - name: Find out outdated and compressed log file, then remove them from host
+     shell: |
+       find  /var/log -mtime +{{EXPIRED_DAYS}}  -name "*.gz" -exec rm -f {} \;
+     when: REMOVE_IND is defined and REMOVE_IND == "YES"
+     tags:
+       - remove
+
