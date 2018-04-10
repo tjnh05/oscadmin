@@ -1,0 +1,66 @@
+---
+# Create instance 
+# written by bodhi wang
+# jyxz5@qq.com
+# Apr 5, 2018
+- hosts: controller.xxx.com
+  become: no
+
+  vars:
+    instanceName: "visualss"
+    flavorName: "m1.large.v2"
+    cloud: "dai"
+    openstackrc: "./keystonerc_bodhi"
+    netname: "selfservice"
+    keyfile: "./daikey.pem"
+    image: "CentOS7mini"
+
+  tasks:
+  - name: create security groups
+    os_security_group:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     description: security group for {{instanceName}} server
+
+  - name: add security group rules
+    os_security_group_rule:
+     cloud: "{{cloud}}"
+     security_group: "{{instanceName}}"
+     state: present
+     protocol: tcp
+     port_range_min: "{{item}}"
+     port_range_max: "{{item}}"
+     remote_ip_prefix: 0.0.0.0/0
+    with_items:
+     - 8088
+    tags:
+     - addsecgrp
+
+  - name: Create a new instance and attaches to a network and passes metadata to the instance
+    os_server:
+     cloud: "{{cloud}}"
+     state: present
+     name: "{{instanceName}}"
+     image: "{{image}}"
+     key_name: DAIKey
+     timeout: 200
+     flavor: "{{flavorName}}"
+     security_groups: "default,{{instanceName}}"
+     nics:
+       - net-name: "{{netname}}"
+     auto_ip: yes
+     #floating_ips:
+     #  - 10.13.1.71
+     meta:
+       hostname: "{{instanceName}}"
+    register: instance
+
+  - name: Show result of creation
+    debug:
+      var: "{{item}}"
+    with_items:
+      #- instance
+      #- instance.server.accessIPv4
+      - instance.server.public_v4
+      - instance.server.private_v4
