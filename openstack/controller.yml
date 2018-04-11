@@ -7,6 +7,9 @@
   become: yes
   become_user: root
 
+  vars:
+    TMP_STR: "    "
+
   tasks:
    - name: Install packages
      yum: name={{item}} state=present 
@@ -14,7 +17,122 @@
        - python-devel
        - python-openstackclient
        - python-heatclient
+     tags:
+       - basic
+
    - name: Install python modules
      pip: name={{item}} state=present extra_args="--upgrade"
      with_items:
        - shade
+     tags:
+       - basic
+
+   - name: Install public signing key of elastic.
+     rpm_key: 
+       key: "{{item}}"
+       state: present
+     with_items:
+       - https://packages.elastic.co/GPG-KEY-elasticsearch
+     tags:
+       - elk
+
+   - name: Add repository elastic-6.x
+     yum_repository:
+       name: elastic-6.x
+       description: Elastic repository for 6.x packages
+       baseurl: https://artifacts.elastic.co/packages/6.x/yum
+       gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+       gpgcheck: yes
+       #repo_gpgcheck: yes
+       enabled: yes
+     tags:
+       - elk
+
+   - name: Install filebeat.
+     yum:
+       name: "{{item}}"
+       state: present
+     with_items:
+       - filebeat
+     tags:
+       - elk
+
+   - name: Remove path /var/log/*.log from /etc/filebeat/filebeat.yml
+     lineinfile:
+       path: /etc/filebeat/filebeat.yml
+       regexp: '^\s+- /var/log/\*\.log'
+       state: absent
+     tags:
+       - elk
+    
+   - name: Modify config file for filebeat
+     blockinfile:
+       path: /etc/filebeat/filebeat.yml
+       insertafter: "^  paths:"
+       block: |
+         {{TMP_STR}}- /var/log/secure
+         {{TMP_STR}}- /var/log/messages
+         {{TMP_STR}}- /var/log/yum.log
+         {{TMP_STR}}- /var/log/dmesg
+         {{TMP_STR}}- /var/log/mariadb/mariadb.log
+         {{TMP_STR}}- /var/log/glance/registry.log
+         {{TMP_STR}}- /var/log/glance/api.log
+         {{TMP_STR}}- /var/log/horizon/horizon.log
+         {{TMP_STR}}- /var/log/gnocchi/statsd.log
+         {{TMP_STR}}- /var/log/gnocchi/app.log
+         {{TMP_STR}}- /var/log/gnocchi/metricd.log
+         {{TMP_STR}}- /var/log/gnocchi/gnocchi-upgrade.log
+         {{TMP_STR}}- /var/log/ceilometer/api.log
+         {{TMP_STR}}- /var/log/ceilometer/ceilometer-upgrade.log
+         {{TMP_STR}}- /var/log/ceilometer/agent-notification.log
+         {{TMP_STR}}- /var/log/ceilometer/collector.log
+         {{TMP_STR}}- /var/log/ceilometer/central.log
+         {{TMP_STR}}- /var/log/keystone/keystone.log
+         {{TMP_STR}}- /var/log/httpd/keystone_wsgi_admin_access.log
+         {{TMP_STR}}- /var/log/httpd/keystone_wsgi_main_access.log
+         {{TMP_STR}}- /var/log/httpd/horizon_access.log
+         {{TMP_STR}}- /var/log/httpd/horizon_error.log
+         {{TMP_STR}}- /var/log/httpd/error_log
+         {{TMP_STR}}- /var/log/httpd/access_log
+         {{TMP_STR}}- /var/log/mongodb/mongodb.log
+         {{TMP_STR}}- /var/log/cinder/api.log
+         {{TMP_STR}}- /var/log/cinder/volume.log
+         {{TMP_STR}}- /var/log/cinder/cinder-manage.log
+         {{TMP_STR}}- /var/log/cinder/scheduler.log
+         {{TMP_STR}}- /var/log/cinder/backup.log
+         {{TMP_STR}}- /var/log/rabbitmq/rabbit@controller.log
+         {{TMP_STR}}- /var/log/redis/redis.log
+         {{TMP_STR}}- /var/log/aodh/listener.log
+         {{TMP_STR}}- /var/log/aodh/notifier.log
+         {{TMP_STR}}- /var/log/aodh/app.log
+         {{TMP_STR}}- /var/log/aodh/evaluator.log
+         {{TMP_STR}}- /var/log/neutron/ovs-cleanup.log
+         {{TMP_STR}}- /var/log/neutron/metering-agent.log
+         {{TMP_STR}}- /var/log/neutron/l3-agent.log
+         {{TMP_STR}}- /var/log/neutron/dhcp-agent.log
+         {{TMP_STR}}- /var/log/neutron/openvswitch-agent.log
+         {{TMP_STR}}- /var/log/neutron/metadata-agent.log
+         {{TMP_STR}}- /var/log/neutron/server.log
+         {{TMP_STR}}- /var/log/neutron/neutron-ns-metadata-proxy-797b2a98-e7a1-45cf-b286-e7ff2a46b576.log
+         {{TMP_STR}}- /var/log/neutron/neutron-ns-metadata-proxy-16d8d217-508a-41e4-906a-383d254c619c.log
+         {{TMP_STR}}- /var/log/nova/nova-cert.log
+         {{TMP_STR}}- /var/log/nova/nova-consoleauth.log
+         {{TMP_STR}}- /var/log/nova/nova-novncproxy.log
+         {{TMP_STR}}- /var/log/nova/nova-conductor.log
+         {{TMP_STR}}- /var/log/nova/nova-scheduler.log
+         {{TMP_STR}}- /var/log/nova/nova-api.log
+         {{TMP_STR}}- /var/log/nova/nova-placement-api.log
+         {{TMP_STR}}- /var/log/openvswitch/ovsdb-server.log
+         {{TMP_STR}}- /var/log/openvswitch/ovs-vswitchd.log
+     tags:
+       - elk
+
+   - name: Enable filebeat to start automatically during boot.
+     systemd:
+       name: "{{item}}"
+       enabled: yes
+       masked: no
+     with_items:
+       - filebeat
+     tags:
+       - elk
