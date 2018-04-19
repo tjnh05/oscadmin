@@ -10,9 +10,9 @@
     instanceName: "cms"
     flavorName: "m1.large.v2"
     cloud: "dai"
-    openstackrc: "./keystonerc_bodhi"
+    openstackrc: "./keystonerc"
     netname: "selfservice"
-    keyfile: "./daikey.pem"
+    keyfile: "./key.pem"
     image: "CentOS7mini"
 
   tasks:
