@@ -1,0 +1,329 @@
+---
+# post process for instance 
+# written by bodhi wang
+# jyxz5@qq.com
+# Apr 5, 2018
+# 
+# modify the process to modify user's passwords.
+# jyxz5@qq.com
+# Mar 28, 2018
+#
+- hosts: cms.xxx.com
+  become: yes
+  become_user: root
+
+  vars:
+    RESET_PASSWD: "NO"
+    INST_DIR: "/opt/"
+    GEN_CERT: "NO"
+    NGROK_DIR: /usr/bin/
+
+  tasks:
+  - name: Update the system to the latest
+    command: yum update -y
+    args:
+      warn: no
+    tags:
+      - system
+
+  - name: Set timezone as Asia/Shanghai
+    command: timedatectl set-timezone Asia/Shanghai
+    tags:
+      - system
+
+  - name: Generate root/centos password
+    shell: |
+           openssl rand -hex 10|awk '{print "root:"$1}'
+           openssl rand -hex 10|awk '{print "centos:"$1}'
+    register: password
+    args:
+      warn: no
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Show register variable
+    debug:
+      var: password.stdout
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify password of user root and centos
+    shell: echo -e "{{password.stdout}}" | chpasswd
+    when: RESET_PASSWD is defined and RESET_PASSWD == "YES"
+    tags:
+      - system
+
+  - name: Modify /etc/ssh/sshd_config
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      regexp: '^PasswordAuthentication yes'
+      insertafter: "^#PasswordAuthentication yes"
+      line: 'PasswordAuthentication yes'
+    tags:
+      - system
+    
+  - name: Restart sshd service
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - sshd
+    tags:
+      - system
+
+  - name: Disable SELinux (/etc/selinux/config)
+    selinux:
+      state: disabled
+    register: result
+    tags:
+      - system
+
+  - name: Show the result of disabling SELinux
+    debug:
+      var: result
+    tags:
+      - system
+
+  - name: Set enforce of SELinux as 0
+    command: setenforce 0
+    #args:
+    #  warn: no
+    tags:
+      - system
+
+  - name: Install epel-release.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - epel-release
+    tags:
+      - system
+
+  - name: Upgrade python-setuptools
+    yum:
+      name: "{{item}}"
+      state: latest
+    with_items:
+      - python-setuptools
+    tags:
+      - basic
+
+  - name: Install packages.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - python-devel 
+      - python-pip 
+      - python-wheel 
+      - unzip
+      - wget
+      - httpd
+      - php
+      - php-mysql
+      - php-fpm
+      - php-gd
+      - php-ldap
+      - php-odbc
+      - php-pear
+      - php-xml
+      - php-xmlrpc
+      - php-mbstring
+      - php-snmp
+      - php-soap
+      - curl
+      - mod_ssl
+      - ngrok
+    tags:
+      - basic
+      - php
+      - ngrok
+
+  - name: Install webtatic-release.rpm
+    yum:
+      name: "https://mirror.webtatic.com/yum/el7/webtatic-release.rpm"
+      state: present
+    tags:
+      - basic
+      - php
+      - php56
+
+  - name: remove php-common packages.
+    yum:
+      name: "{{item}}"
+      state: absent
+    with_items:
+      - php-common
+    tags:
+      - basic
+      - php
+      - php56
+  
+  - name: Install php56 packages.
+    yum:
+      name: "{{item}}"
+      state: present
+    with_items:
+      - php56w
+      - php56w-opcache
+      - php56w-xml
+      - php56w-mcrypt
+      - php56w-gd
+      - php56w-devel
+      - php56w-mysql
+      - php56w-intl
+      - php56w-mbstring
+    tags:
+      - basic
+      - php
+      - php56
+
+  - name: Upgrade pip
+    pip: 
+      name: "{{item}}"
+      state: latest
+      extra_args: --upgrade
+    with_items:
+      - setuptools
+      - pip
+    tags:
+      - basic
+
+  - name: Install python modules from pypi
+    pip: 
+      name: "{{item}}"
+      state: present
+    with_items:
+      - djangocms-installer
+    tags:
+      - application
+
+  - name: Generate private key and public cert.
+    shell: |
+           #openssl genrsa -out cms.xxx.com.key 2048
+           #openssl req -new -key cms.xxx.com.key -out cms.xxx.com.csr
+           #openssl x509 -req -days 3650 -in cms.xxx.com.csr \
+           #        -signkey cms.xxx.com.key -out cms.xxx.com.crt
+           mv cms.xxx.com.crt /etc/pki/tls/certs/
+           mv cms.xxx.com.key /etc/pki/tls/private/
+           mv cms.xxx.com.csr /etc/pki/tls/private/
+           chmod 0600 /etc/pki/tls/private/cms.xxx.com.key
+           chmod 0644 /etc/pki/tls/certs/cms.xxx.com.crt
+    args:
+      chdir: ~/
+      warn: no
+    when: GEN_CERT is defined and GEN_CERT == "YES"
+    tags:
+      - cert
+
+  - name: Creates directory
+    file: path="{{item}}" state=directory
+    with_items:
+      - "{{INST_DIR}}cms"
+      - "{{INST_DIR}}joomla"
+      - /var/www/html/joomla
+    tags:
+      - application
+      - dir
+      - joomla
+      - joomladownload
+      
+  - name: Create Django project called mysite
+    command: djangocms -f -p . mysite
+    args:
+      chdir: "{{INST_DIR}}cms"
+    tags:
+      - application
+      - mysite
+
+  - name: Start up the runserver
+    shell: |
+      nohup python manage.py runserver 1>cms.log 2>&1 &
+    args:
+      chdir: "{{INST_DIR}}cms"
+    tags:
+      - runserver
+      #- application
+
+  - name: Unzip wordpress archive.
+    unarchive: 
+      dest: "{{ INST_DIR }}"
+      src: https://wordpress.org/latest.zip
+      remote_src: yes
+    tags:
+      - wordpress
+
+  - name: Unzip joomla archive.
+    unarchive: 
+      dest: "{{ INST_DIR }}joomla"
+      #src: http://joomlacode.org/gf/download/frsrelease/19665/160049/Joomla_3.3.3-Stable-Full_Package.zip
+      src: https://downloads.joomla.org/cms/joomla3/3-8-6/Joomla_3-8-6-Stable-Full_Package.zip?format=zip
+      remote_src: yes
+    tags:
+      - joomla
+      - joomladownload
+
+  - name: Transfer wordpress to www directory
+    command: rsync -avP "{{ INST_DIR }}wordpress/" /var/www/html/
+    args:
+      warn: no
+    tags:
+      - wordpress
+      - www
+
+  - name: Transfer wordpress to www directory
+    command: rsync -avP "{{item}}" /var/www/html/
+    with_items:
+      - "{{INST_DIR}}joomla"
+    args:
+      warn: no
+    tags:
+      - joomla
+      - www
+
+  - name: Creates directory
+    file: path="/var/www/html/wp-content/uploads" state=directory
+    tags:
+      - application
+      - dir
+      
+  - name: Change owner and group
+    file: path="/var/www/html/" state=directory group=apache owner=apache recurse=yes
+    tags:
+      - application
+      - dir
+      - joomla
+
+  - name: Genernate wp-config.php
+    copy:
+      src:  /var/www/html/wp-config-sample.php
+      dest: /var/www/html/wp-config.php
+      remote_src: yes
+      owner: apache
+      group: apache
+      mode: 0600
+    tags:
+      - application
+      - config
+
+  - name: Start up httpd service
+    service:
+      name: "{{item}}"
+      state: restarted
+      enabled: yes
+    with_items:
+      - httpd
+    tags:
+      - httpd
+      - php56
+
+  - name: Unzip ngrok archive.
+    unarchive:
+      dest: "{{ NGROK_DIR }}"
+      src: https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+      remote_src: yes
+    tags:
+      - ngrok
