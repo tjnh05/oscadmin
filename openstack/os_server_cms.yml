@@ -9,10 +9,10 @@
   vars:
     instanceName: "cms"
     flavorName: "m1.large.v2"
-    cloud: "mycloud"
-    openstackrc: "./ksrc"
-    netname: "privnet"
-    keyfile: "./key.pem"
+    cloud: "dai"
+    openstackrc: "./keystonerc_bodhi"
+    netname: "selfservice"
+    keyfile: "./daikey.pem"
     image: "CentOS7mini"
 
   tasks:
